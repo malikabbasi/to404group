@@ -22,7 +22,7 @@ library(leaflet.extras)
 ### Loading Data
 #### Dataset is roughly 1% of total citibike 2019 data due to github file size restrictions
 
-```{r}
+```{r, include=FALSE}
 citi <- read.csv("citismall.csv")
 #round latitude/longtidue
 citi$start.station.latitude <- round(citi$start.station.latitude, 4) 
@@ -33,7 +33,7 @@ citi$end.station.longitude <- round(citi$end.station.longitude, 4)
 
 ### Traffic 
 
-### Top Ten Start/End Stations Barplots
+#### Top Ten Start/End Stations Barplots
 ```{r}
 x = table(citi$start.station.name)  
 citi_start = as.data.frame(x)
@@ -53,8 +53,7 @@ theme_minimal() + theme(axis.text.x = element_text(angle = 60, vjust = 0.5, hjus
 grid.arrange(plot1, plot2, ncol= 2)
 ```
 
-### Top 10 Start/End Stations Maps
-
+#### Start/End Stations Maps Heatmap
 ```{r}
 #start stations heatmap 
 leaflet(citi) %>%
@@ -75,21 +74,26 @@ leaflet(citi) %>%
   ) 
 ```
 
-### Top Routes 
+#### Top Routes 
 ```{r}
 citi$route <- paste(citi$start.station.name,citi$end.station.name,sep=" -> ")
+citi$path_long <- paste(citi$start.station.longitude,citi$end.station.longitude,sep=" , ")
+citi$path_lat <- paste(citi$start.station.latitude,citi$end.station.latitude,sep=" , ")
 
-stations_routes <- data.frame(distinct(citi,start.station.name, start.station.latitude, start.station.longitude, end.station.))
+top5_routes <- citi %>% group_by(route, path_long, path_lat, start.station.latitude, start.station.longitude, end.station.latitude, end.station.longitude) %>% summarize(count=n()) %>% ungroup() %>% arrange(desc(count)) %>% head(n=5) 
 
-top10_routes <- citi %>% group_by(route, start.station.latitude,start.station.longitude,  ) %>% summarize(count=n()) %>% ungroup() %>% arrange(desc(count)) %>% head(n=10) 
+leaflet(top5_routes) %>%  
+  addTiles() %>%
+  setView(-74, 40.75, zoom = 11.5) %>% 
+  addPolylines(lng = top5_routes$start.station.longitude, lat = top5_routes$start.station.latitude, group = ~route) %>%
+     addMarkers(lng = top5_routes$start.station.longitude, lat = top5_routes$start.station.latitude,
+     popup = "Starting") %>%
+     addMarkers(lng = top5_routes$end.station.longitude, lat = top5_routes$end.station.latitude,
+                popup = "Destination") 
 
-start <- citi %>% group_by(start.station.name,start.station.latitude,start.station.longitude) %>% summarize(count=n()) %>% ungroup() %>% arrange(desc(count))
+```
 
-end <- citi %>% group_by(end.station.name,end.station.latitude,end.station.longitude) %>% summarize(count=n()) %>% ungroup() %>% arrange(desc(count)) %>% head(n=10) 
-
-start_end <- cbind(start,end) 
-``` 
-
+#### Deficit/Surplus
 
 ```{r}
 #departures
@@ -104,19 +108,84 @@ arrival_count <- summarise(bike_arrivals, count_arrival = n())
 bike_deficit <- merge(departure_count, arrival_count, all = TRUE)
 bike_deficit[is.na(bike_deficit)] <- 0
 bike_deficit$deficit <- bike_deficit$count_dep - bike_deficit$count_arrival
-bike_deficit <- bike_deficit %>% arrange(desc(deficit))
-bike_top_10 <- 
 
-
-
-#map by deficit
+#map by deficit (all stations)
 leaflet(bike_deficit) %>% 
   addTiles() %>%
   setView(-74, 40.75, zoom = 11.5) %>%
   addCircleMarkers(lng = bike_deficit$longitude, lat = bike_deficit$latitude, 
                    popup = paste(bike_deficit$station, "<br>", ifelse(bike_deficit$deficit>=0, "Bike deficit = ", "Bike surplus = "), 
                                 abs(bike_deficit$deficit)), 
-                   radius = abs(bike_deficit$deficit)/5, color = ifelse(bike_deficit$deficit>0, "red", "green"))
-
+                   radius = abs(bike_deficit$deficit)/5, color = ifelse(bike_deficit$deficit>0, "red", "green")) 
 ```
+
+```{r}
+popup <- paste0("<b>", bike_deficit$station, "</b><br>",
+                "Deficit/Surplus: ", bike_deficit$deficit, "<br>",
+                "Arrival Count: ", bike_deficit$count_arrival, "<br>",
+                "Departure Count: ", bike_deficit$count_dep, "<br>")
+```
+
+```{r}
+#top 5 deficit 
+bike_deficit_5<-arrange(bike_deficit, (deficit))[1:5,]
+
+leaflet(bike_deficit_5) %>% 
+  addTiles() %>%
+  addMarkers(lng = ~longitude, lat = ~latitude, popup = popup) 
+```
+
+```{r}
+#top 5 surplus
+bike_surplus_5<-arrange(bike_deficit, -deficit)[1:5,]
+
+leaflet(bike_surplus_5) %>% 
+  addTiles() %>%
+  addMarkers(lng = ~longitude, lat = ~latitude, popup = popup) 
+```
+
+#### Start Stations by Usertype 
+
+```{r}
+citistations <- citi %>%
+  group_by(start.station.name, start.station.latitude, start.station.longitude, usertype) %>%
+  summarize(count = n())
+colnames(citistations) <- c("name", "lat", "long", "usertype", "count") 
+
+# Replace with NA those stations that do not have a name
+citistations[citistations$name == "NULL"] <- NA
+
+# Gets rid of all the rows with NA
+citistations <- citistations[complete.cases(citistations[,1:3]),]
+
+m2 <- leaflet(citistations) %>% 
+      addTiles() %>% 
+      addCircleMarkers(lat = citistations$lat, lng = citistations$long, popup = citistations$name, radius = citistations$count/100, color = ifelse(citistations$usertype == "Subscriber", "blue", "red"))
+m2
+```
+
+#### Start Stations by Usertype
+
+```{r}
+citi <- citi[!(citi$gender=="unknown"),]
+citistations_gender <- citi %>%
+  group_by(start.station.name, start.station.latitude, start.station.longitude, gender) %>%
+  summarize(count = n())
+colnames(citistations_gender) <- c("name", "lat", "long", "gender", "count") 
+
+# Replace with NA those stations that do not have a name
+citistations_gender[citistations_gender == "NULL"] <- NA
+
+# Gets rid of all the rows with NA
+citistations_gender <- citistations_gender[complete.cases(citistations_gender[,1:3]),]
+
+m3 <- leaflet(citistations_gender) %>% 
+      addTiles() %>% 
+      addCircleMarkers(lat = citistations_gender$lat, lng = citistations_gender$long, popup = citistations_gender$name, radius = citistations_gender$count/100, color = ifelse(citistations_gender$gender == "male", "blue", "red"))
+
+m3
+```
+
+
+
 

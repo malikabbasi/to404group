@@ -24,6 +24,11 @@ library(leaflet.extras)
 
 ```{r}
 citi <- read.csv("citismall.csv")
+#round latitude/longtidue
+citi$start.station.latitude <- round(citi$start.station.latitude, 4) 
+citi$end.station.latitude <- round(citi$end.station.latitude, 4) 
+citi$start.station.longitude <- round(citi$start.station.longitude, 4) 
+citi$end.station.longitude <- round(citi$end.station.longitude, 4) 
 ```
 
 ### Traffic 
@@ -74,6 +79,8 @@ leaflet(citi) %>%
 ```{r}
 citi$route <- paste(citi$start.station.name,citi$end.station.name,sep=" -> ")
 
+stations_routes <- data.frame(distinct(citi,start.station.name, start.station.latitude, start.station.longitude, end.station.))
+
 top10_routes <- citi %>% group_by(route, start.station.latitude,start.station.longitude,  ) %>% summarize(count=n()) %>% ungroup() %>% arrange(desc(count)) %>% head(n=10) 
 
 start <- citi %>% group_by(start.station.name,start.station.latitude,start.station.longitude) %>% summarize(count=n()) %>% ungroup() %>% arrange(desc(count))
@@ -82,3 +89,34 @@ end <- citi %>% group_by(end.station.name,end.station.latitude,end.station.longi
 
 start_end <- cbind(start,end) 
 ``` 
+
+
+```{r}
+#departures
+bike_departures <- group_by(citi, station = `start.station.name`, latitude = `start.station.latitude`, longitude = `start.station.longitude`)
+departure_count <- summarise(bike_departures, count_dep = n()) 
+
+#arrivals
+bike_arrivals <- group_by(citi, station = `end.station.name`, latitude = `end.station.latitude`, longitude = `end.station.longitude`)
+arrival_count <- summarise(bike_arrivals, count_arrival = n())
+
+#merge 
+bike_deficit <- merge(departure_count, arrival_count, all = TRUE)
+bike_deficit[is.na(bike_deficit)] <- 0
+bike_deficit$deficit <- bike_deficit$count_dep - bike_deficit$count_arrival
+bike_deficit <- bike_deficit %>% arrange(desc(deficit))
+bike_top_10 <- 
+
+
+
+#map by deficit
+leaflet(bike_deficit) %>% 
+  addTiles() %>%
+  setView(-74, 40.75, zoom = 11.5) %>%
+  addCircleMarkers(lng = bike_deficit$longitude, lat = bike_deficit$latitude, 
+                   popup = paste(bike_deficit$station, "<br>", ifelse(bike_deficit$deficit>=0, "Bike deficit = ", "Bike surplus = "), 
+                                abs(bike_deficit$deficit)), 
+                   radius = abs(bike_deficit$deficit)/5, color = ifelse(bike_deficit$deficit>0, "red", "green"))
+
+```
+

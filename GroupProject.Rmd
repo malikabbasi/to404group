@@ -9,6 +9,16 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+```{r, include=FALSE}
+library(dplyr)
+library(leaflet)
+library(ggplot2)
+library(gganimate)
+library(hrbrthemes)
+library(gridExtra)
+library(leaflet.extras)
+```
+
 ### Loading Data
 #### Dataset is roughly 1% of total citibike 2019 data due to github file size restrictions
 
@@ -16,3 +26,59 @@ knitr::opts_chunk$set(echo = TRUE)
 citi <- read.csv("citismall.csv")
 ```
 
+### Traffic 
+
+### Top Ten Start/End Stations Barplots
+```{r}
+x = table(citi$start.station.name)  
+citi_start = as.data.frame(x)
+y <- top_n(citi_start, 10) %>% arrange(desc(Freq))
+top_start_count <- as.data.frame(y) 
+
+plot1 <- ggplot(top_start_count, aes(reorder(Var1,-Freq), Freq)) + geom_bar(stat="identity", fill = "lightblue") + geom_text(aes(label=Freq), vjust=-0.3, size=3.5) + 
+theme_minimal() + theme(axis.text.x = element_text(angle = 60, vjust = 0.5, hjust=0.5)) + ggtitle("Top 10 Start Stations") + xlab("Station Name") + ylab("Total Trips Started Out of station") 
+
+n = table(citi$end.station.name)  
+citi_end = as.data.frame(n)
+m <- top_n(citi_end, 10) %>% arrange(desc(Freq))
+top_end_count <- as.data.frame(m) 
+
+plot2 <- ggplot(top_end_count, aes(reorder(Var1,-Freq), Freq)) + geom_bar(stat="identity", fill = "lightblue") + geom_text(aes(label=Freq), vjust=-0.3, size=3.5) + 
+theme_minimal() + theme(axis.text.x = element_text(angle = 60, vjust = 0.5, hjust=0.5)) + ggtitle("Top 10 End Stations") + xlab("Station Name") + ylab("Total Trips Ended at Station")
+grid.arrange(plot1, plot2, ncol= 2)
+```
+
+### Top 10 Start/End Stations Maps
+
+```{r}
+#start stations heatmap 
+leaflet(citi) %>%
+  addProviderTiles(providers$providers$CartoDB.DarkMatter) %>% setView(lng = -73.98928, lat = 40.75042, zoom = 10) %>%
+  addHeatmap(
+    lng = ~start.station.longitude, lat = ~start.station.latitude,
+    blur = 20, max = 0.05, radius = 15
+  ) 
+```
+
+```{r}
+#end stations heatmap 
+leaflet(citi) %>%
+  addProviderTiles(providers$providers$CartoDB.DarkMatter) %>% setView(lng = -73.98928, lat = 40.75042, zoom = 10) %>%
+  addHeatmap(
+    lng = ~end.station.longitude, lat = ~end.station.latitude,
+    blur = 20, max = 0.05, radius = 15
+  ) 
+```
+
+### Top Routes 
+```{r}
+citi$route <- paste(citi$start.station.name,citi$end.station.name,sep=" -> ")
+
+top10_routes <- citi %>% group_by(route, start.station.latitude,start.station.longitude,  ) %>% summarize(count=n()) %>% ungroup() %>% arrange(desc(count)) %>% head(n=10) 
+
+start <- citi %>% group_by(start.station.name,start.station.latitude,start.station.longitude) %>% summarize(count=n()) %>% ungroup() %>% arrange(desc(count))
+
+end <- citi %>% group_by(end.station.name,end.station.latitude,end.station.longitude) %>% summarize(count=n()) %>% ungroup() %>% arrange(desc(count)) %>% head(n=10) 
+
+start_end <- cbind(start,end) 
+``` 

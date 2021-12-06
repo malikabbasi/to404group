@@ -2,7 +2,13 @@
 title: "GroupProject"
 author: "Malik Abbasi"
 date: "11/29/2021"
-output: html_document
+output:
+  html_document:
+    code_folding: show
+    toc: true
+    toc_float:
+      toc_collapsed: true
+  pdf_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -17,21 +23,69 @@ library(gganimate)
 library(hrbrthemes)
 library(gridExtra)
 library(leaflet.extras)
+library(ggthemes)
+library(hrbrthemes)
 ```
 
-### Loading Data
+### 1. Understand the Data
 #### Dataset is roughly 1% of total citibike 2019 data due to github file size restrictions
 
 ```{r, include=FALSE}
 citi <- read.csv("citismall.csv")
-#round latitude/longtidue
+#round latitude/longitude
 citi$start.station.latitude <- round(citi$start.station.latitude, 4) 
 citi$end.station.latitude <- round(citi$end.station.latitude, 4) 
 citi$start.station.longitude <- round(citi$start.station.longitude, 4) 
 citi$end.station.longitude <- round(citi$end.station.longitude, 4) 
+citi$age_category <- cut(citi$age,breaks=c(0,30,40,50,60,70,80,100),labels=c("under 30","30s","40s","50s","60s","70s","over 80"))  
+
+#Some summary statistics
+summary(citi$age)
+summary(citi$tripduration)
+summary(citi$distMiles)
+summary(citi$speedMilesperHour)
+head(sort(summary(as.factor(citi$start.station.name)), decreasing = TRUE))
+head(sort(summary(as.factor(citi$end.station.name)), decreasing = TRUE))
+head(summary(as.factor(citi$startend)))
+
+#Exploration Visuals
+citi %>% ggplot(aes(x=gender,fill=gender)) + geom_bar(alpha=.8) + theme_fivethirtyeight() + scale_fill_brewer(palette="Set2")+theme(legend.position="none")+ggtitle(expression(atop("Gender of Citi Bikers",atop("71% are Male")))) 
+
+citi %>% ggplot(aes(x=age_category,fill=age_category)) + geom_bar(alpha=.8)+theme_fivethirtyeight()+scale_fill_brewer(palette="Set2")+theme(legend.position="false")+ggtitle(expression(atop("Distribution by Age Group", atop("67.8% of riders are 39 and under"))))
+
+citi %>% ggplot(aes(x=age)) + geom_density()+theme_fivethirtyeight()+theme(axis.text.y=element_blank())+ggtitle("Age Distribution of Citi Bikers")+geom_vline(xintercept=median(citi$age,na.rm=T),linetype="dotted",col="dark green")+annotate("text",x=40,y=.05,label="Median = 35") 
+
+citi %>% filter(gender %in% c("Female","Male")) %>% ggplot(aes(x=gender,y=age,fill=gender))+geom_boxplot(alpha=.3)+ylim(20,50)+theme_fivethirtyeight()+scale_fill_brewer(palette="Set2")+ggtitle("Age Distribution by Gender")+annotate("text",x="Female",y=33,label="Median = 33")+annotate("text",x="Male",y=35,label="Median = 35")
 ```
 
-### Traffic 
+### 2. Idenfity Patterns
+#### Do age and gender effect the speed or distance biked?
+
+```{r, cache=TRUE}
+ggplot(data = citi, aes(x = AWND, y = speedMilesperHour)) + geom_point() + geom_smooth(method = 'lm') + ggtitle("Comparison of average speed to age")
+ggplot(data = citi, aes(x = age, y = distMiles)) + geom_point() + geom_smooth(method = 'lm') + ggtitle("Comparison of age to distance traveled")
+ggplot(data = citi, aes(x = gender, y = distMiles)) + geom_point() + ggtitle("Comparison of distance traveled by gender")
+ggplot(data = citi, aes(x = gender, y = speedMilesperHour)) + geom_point() + ggtitle("Comparison of gender to speed in MPH")
+```
+
+
+#### When do people use citibikes?
+
+```{r, cache=TRUE}
+ggplot(citi) + geom_bar(aes(x=DoW, y=..count.., fill=usertype)) + ggtitle("Count of rides on days of week, broken down by usertype")
+```
+
+#### When do people ride citibikes, and how do they purchase service?
+
+```{r, cache=TRUE}
+ggplot(citi) + geom_bar(aes(x = period, y=(..count..)/sum(..count..), fill = usertype)) + ylab("% of rides") + ggtitle("Percentage of rides per period of the day by usertype")
+ggplot(citi) + geom_bar(aes(x = hour, y=(..count..)/sum(..count..), fill = usertype)) + ylab("% of rides") + ggtitle("Percentage of rides per hour of the day by usertype")
+
+ggplot(citi) + geom_bar(aes(x = month, y=(..count..)/sum(..count..), fill = usertype)) + ylab("% of rides") + ggtitle("Percentage of rides per month by usertype")
+
+```
+
+### 3. Assymetric Traffic 
 
 #### Top Ten Start/End Stations Barplots
 ```{r}
@@ -186,6 +240,15 @@ m3 <- leaflet(citistations_gender) %>%
 m3
 ```
 
+### 4. Bike Usage
+
+### 5. Impact of Weather
+#### Does temperature affect when users ride citibikes?
+```{r}
+ggplot(citi) + geom_histogram(aes(x = TAVG, fill = usertype)) + xlim(0,100) + ggtitle("Counts of rides for average temperatures, broken down by usertype")
+```
 
 
+
+### 6. Insights and Recommendations
 

@@ -29,6 +29,7 @@ library(ggthemes)
 library(tidyr)
 library(gridExtra)
 library(lubridate)
+library(scales)
 theme_set(theme_bw())
 ```
 
@@ -132,7 +133,7 @@ ggplot(citi) + geom_bar(aes(x=weekday, y=(..count..)/sum(..count..), fill=userty
 ```
 
 ```{r}
-ggplot(citi) + geom_bar(aes(x = hour, y=(..count..)/sum(..count..), fill = usertype)) + ylab("% of rides") + ggtitle("Rides per hour of the day, by usertype") + theme_fivethirtyeight()
+ggplot(citi) + geom_bar(aes(x = hour, y=(..count..)/sum(..count..), fill = usertype)) + ylab("% of rides") + ggtitle("Rides per hour of the day, by usertype") 
 ```
 
 
@@ -296,6 +297,18 @@ leaflet(citistations_gender) %>%
 ```
 
 ## **Bike Usage** 
+```{r}
+ggplot(citi) + geom_histogram(aes(x = bikeid), stat= "count") + ggtitle("Count of rides per bikeid")
+
+citi %>% group_by(bikeid) %>% summarise(total = sum(tripduration)) %>% ggplot(aes(reorder(bikeid, total), total)) + geom_col() + scale_y_log10(labels = comma) + ggtitle("Total Duration of Rides per Bike") + theme_fivethirtyeight() + theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank()) + theme(axis.title = element_text()) + ylab("Duration (seconds)")
+
+citi %>% group_by(bikeid) %>% summarise(mean = mean(speedMilesperHour)) %>% filter(mean > 0) %>% ggplot(aes(reorder(bikeid, mean), mean)) + geom_col() + ggtitle("Average Speed per Bike") + theme_fivethirtyeight() + theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank()) + scale_y_continuous(labels = comma) + theme(axis.title = element_text()) + ylab("Miles per Hour")
+
+```
 
 
 

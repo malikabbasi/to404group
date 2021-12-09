@@ -1,14 +1,12 @@
 ---
-title: "GroupProject"
-author: "Malik Abbasi"
+title: "CitiBike Group Project Analysis"
+author: "Anca Craciun, Allyson Grossa, Benjamin Brady, Malik Abbasi & Sindy Sariev"
 date: "11/29/2021"
-output:
+output: 
   html_document:
-    code_folding: show
     toc: true
-    toc_float:
-      toc_collapsed: true
-  pdf_document: default
+    toc_float: true
+    code_folding: show 
 ---
 
 ```{r setup, include=FALSE}
@@ -21,14 +19,18 @@ library(leaflet)
 library(ggplot2)
 library(gganimate)
 library(hrbrthemes)
-library(gridExtra)
 library(leaflet.extras)
+library(gt)
+library(tidyverse)
+library(glue)
+library(sp)
+library(rgeos)
 library(ggthemes)
-library(hrbrthemes)
+library(tidyr)
+library(gridExtra)
+library(lubridate)
+theme_set(theme_bw())
 ```
-
-### 1. Understand the Data
-#### Dataset is roughly 1% of total citibike 2019 data due to github file size restrictions
 
 ```{r, include=FALSE}
 citi <- read.csv("citismall.csv")
@@ -37,119 +39,159 @@ citi$start.station.latitude <- round(citi$start.station.latitude, 4)
 citi$end.station.latitude <- round(citi$end.station.latitude, 4) 
 citi$start.station.longitude <- round(citi$start.station.longitude, 4) 
 citi$end.station.longitude <- round(citi$end.station.longitude, 4) 
-citi$age_category <- cut(citi$age,breaks=c(0,30,40,50,60,70,80,100),labels=c("under 30","30s","40s","50s","60s","70s","over 80"))  
-
-#Some summary statistics
-summary(citi$age)
-summary(citi$tripduration)
-summary(citi$distMiles)
-summary(citi$speedMilesperHour)
-head(sort(summary(as.factor(citi$start.station.name)), decreasing = TRUE))
-head(sort(summary(as.factor(citi$end.station.name)), decreasing = TRUE))
-head(summary(as.factor(citi$startend)))
-
-#Exploration Visuals
-citi %>% ggplot(aes(x=gender,fill=gender)) + geom_bar(alpha=.8) + theme_fivethirtyeight() + scale_fill_brewer(palette="Set2")+theme(legend.position="none")+ggtitle(expression(atop("Gender of Citi Bikers",atop("71% are Male")))) 
-
-citi %>% ggplot(aes(x=age_category,fill=age_category)) + geom_bar(alpha=.8)+theme_fivethirtyeight()+scale_fill_brewer(palette="Set2")+theme(legend.position="false")+ggtitle(expression(atop("Distribution by Age Group", atop("67.8% of riders are 39 and under"))))
-
-citi %>% ggplot(aes(x=age)) + geom_density()+theme_fivethirtyeight()+theme(axis.text.y=element_blank())+ggtitle("Age Distribution of Citi Bikers")+geom_vline(xintercept=median(citi$age,na.rm=T),linetype="dotted",col="dark green")+annotate("text",x=40,y=.05,label="Median = 35") 
-
-citi %>% filter(gender %in% c("Female","Male")) %>% ggplot(aes(x=gender,y=age,fill=gender))+geom_boxplot(alpha=.3)+ylim(20,50)+theme_fivethirtyeight()+scale_fill_brewer(palette="Set2")+ggtitle("Age Distribution by Gender")+annotate("text",x="Female",y=33,label="Median = 33")+annotate("text",x="Male",y=35,label="Median = 35")
 ```
 
-### 2. Idenfity Patterns
-#### Do age and gender effect the speed or distance biked?
+# **Executive Summary** 
 
-```{r, cache=TRUE}
-ggplot(data = citi, aes(x = AWND, y = speedMilesperHour)) + geom_point() + geom_smooth(method = 'lm') + ggtitle("Comparison of average speed to age")
-ggplot(data = citi, aes(x = age, y = distMiles)) + geom_point() + geom_smooth(method = 'lm') + ggtitle("Comparison of age to distance traveled")
-ggplot(data = citi, aes(x = gender, y = distMiles)) + geom_point() + ggtitle("Comparison of distance traveled by gender")
-ggplot(data = citi, aes(x = gender, y = speedMilesperHour)) + geom_point() + ggtitle("Comparison of gender to speed in MPH")
+CitiBike program have tasked us with the responsibility of analyzing data that they have collected about rides in 2019. In order to identify patterns in the ride history data, we investigated the relationship between all given factors. We focused on the demographics of the riders as well as the how and when these riders tend to use the bikes. We believe these aspects could contribute to an increase in ridership and profit. 
+
+Our report provides findings that showcase how riders tend to be 39 years or younger, the majority of riders are subscribers, inclement weather negatively affects ride time, the popular commute times are during the morning and late afternoon/evenings and certain stations have a surplus or deficit of bikes. The report also includes recommendations for the CitiBike program based on findings in terms of marketing efforts, pricing strategies and managing surpluses and deficits. 
+
+## **Exploratory Visualizations**
+
+#### _Gender_
+
+```{r, include=FALSE}
+round(nrow(citi[citi$gender == "male",])/nrow(citi),2)
+round(nrow(citi[citi$gender == "female",])/nrow(citi),2)
+round(nrow(citi[citi$gender == "unknown",])/nrow(citi),2)
 ```
 
-
-#### When do people use citibikes?
-
-```{r, cache=TRUE}
-ggplot(citi) + geom_bar(aes(x=DoW, y=..count.., fill=usertype)) + ggtitle("Count of rides on days of week, broken down by usertype")
-```
-
-#### When do people ride citibikes, and how do they purchase service?
-
-```{r, cache=TRUE}
-ggplot(citi) + geom_bar(aes(x = period, y=(..count..)/sum(..count..), fill = usertype)) + ylab("% of rides") + ggtitle("Percentage of rides per period of the day by usertype")
-ggplot(citi) + geom_bar(aes(x = hour, y=(..count..)/sum(..count..), fill = usertype)) + ylab("% of rides") + ggtitle("Percentage of rides per hour of the day by usertype")
-
-ggplot(citi) + geom_bar(aes(x = month, y=(..count..)/sum(..count..), fill = usertype)) + ylab("% of rides") + ggtitle("Percentage of rides per month by usertype")
-
-```
-
-### 3. Assymetric Traffic 
-
-#### Top Ten Start/End Stations Barplots
 ```{r}
+citi %>% ggplot(aes(x=gender,fill=gender)) + geom_bar(alpha=.8) + theme_fivethirtyeight() + scale_fill_brewer(palette="Set2")+theme(legend.position="none")+ggtitle(expression(atop("Gender of Citi Bikers"))) 
+```
+
+When looking at the distribution of riders based on gender, it is clear that the majority of riders in the 2019 data set were males (68%). Females and unidentified genders only make up a combined 32% of riders in 2019. 
+
+#### _Age_ 
+
+```{r, include=FALSE}
+citi$age_category <- cut(citi$age,breaks=c(0,30,40,50,60,70,80,100),labels=c("under 30","30s","40s","50s","60s","70s","over 80")) 
+citi <- na.omit(citi)
+nrow(citi[citi$age_category == "30s" | citi$age_category == "under 30",])/nrow(citi) 
+```
+
+```{r}
+citi %>% ggplot(aes(x=age_category,fill=age_category)) + geom_bar(alpha=.8)+theme_fivethirtyeight()+scale_fill_brewer(palette="Set2")+theme(legend.position="false")+ggtitle(expression(atop("Distribution by Age Group")))
+```
+
+In terms of the age distribution, it is clear that the majority of riders tend to come from younger age groups. Around 56.3% of riders in 2019 were 39 years and under, meaning only 43.7% of riders were 40 and over. 
+
+```{r}
+ggplot(data = citi, aes(x = age, y = distMiles)) + geom_point() + geom_smooth(method = 'lm') + ggtitle("Comparison of Age to Distance traveled") + theme_fivethirtyeight()
+```
+
+
+## **Ride History Patterns**
+
+
+#### _Usertype_ 
+
+```{r}
+
+
+
+```
+
+#### _Commute Times_
+
+```{r, include=FALSE}
+commute.categories <- c("12am-5am", "5am-7am", 
+                      "7am-10am", "10am-2pm",
+                       "2pm-4pm","4pm-7pm", 
+                       "7pm-10pm","10pm-12am")
+citi$time <- cut(as.numeric(citi$hour), breaks=c(0, 5, 7, 10, 14, 16, 19, 22, 24), labels=commute.categories)
+citi <- na.omit(citi)
+```
+
+```{r, message=FALSE}
+ggplot(citi) + geom_bar(aes(time, fill=gender)) + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) + ggtitle(expression(atop("Commute Times by Gender"))) + scale_fill_manual(values = c("lightgreen", "lightblue","pink")) + scale_fill_brewer(palette="Set2") + theme_fivethirtyeight() #+transition_states(states = time)+enter_fade() + shadow_mark()  
+```
+
+The most popular times for rides seem to occur during the morning commute time of 7am-10am as well as the late afternoon / evening commute of 4pm to 7pm. Using information from the previous graph that showcases how majority of riders are subscribers that utilize the bikes more heavily during the weekdays, we can see that these time gaps correlate to working hours. Thus, subscribers usually take the bikes to get to work in the morning and then to get back home in the late afternoons/evenings. This information could be useful for CitiBike to use to make sure bikes are available for use during the most frequented times of day. 
+
+```{r, include=FALSE}
+avg_speed_age <- citi %>% filter(gender == "male" | gender == "female", age < 90)
+avg_speed_age <- avg_speed_age %>% group_by(age, gender) %>% summarize(mean_speed = mean(speedMilesperHour))
+```
+
+#### _Average Speed_
+
+```{r}
+ggplot(avg_speed_age) + geom_line(aes(as.numeric(age), mean_speed, color = gender)) + labs(title = "Average Speed based on Age and Gender in 2019", x = "Age", y = "Average Speed (Miles Per Hour)") + theme(plot.title = element_text(hjust = 0.7)) + theme_fivethirtyeight() + scale_color_discrete(name = "Gender", labels = c("Female", "Male")) #+ transition_reveal(age)
+```
+
+#### _Rides by Weekday/Hour_
+
+```{r, include=FALSE}
+citi$weekday <- wday(citi$starttime, label=TRUE)
+```
+
+```{r}
+ggplot(citi) + geom_bar(aes(x=weekday, y=(..count..)/sum(..count..), fill=usertype)) + ggtitle("Rides on days of week, by usertype") + theme_fivethirtyeight() + xlab("Weekday") + ylab("Percentage of All Rides")
+```
+
+```{r}
+ggplot(citi) + geom_bar(aes(x = hour, y=(..count..)/sum(..count..), fill = usertype)) + ylab("% of rides") + ggtitle("Rides per hour of the day, by usertype") + theme_fivethirtyeight()
+```
+
+
+## **Traffic** 
+
+#### _Top Ten Start/End Stations Barplots_
+```{r, include=FALSE}
 x = table(citi$start.station.name)  
 citi_start = as.data.frame(x)
 y <- top_n(citi_start, 10) %>% arrange(desc(Freq))
 top_start_count <- as.data.frame(y) 
 
-plot1 <- ggplot(top_start_count, aes(reorder(Var1,-Freq), Freq)) + geom_bar(stat="identity", fill = "lightblue") + geom_text(aes(label=Freq), vjust=-0.3, size=3.5) + 
-theme_minimal() + theme(axis.text.x = element_text(angle = 60, vjust = 0.5, hjust=0.5)) + ggtitle("Top 10 Start Stations") + xlab("Station Name") + ylab("Total Trips Started Out of station") 
-
 n = table(citi$end.station.name)  
 citi_end = as.data.frame(n)
 m <- top_n(citi_end, 10) %>% arrange(desc(Freq))
 top_end_count <- as.data.frame(m) 
+```
+```{r}
+plot1 <- ggplot(top_start_count, aes(reorder(Var1,-Freq), Freq)) + geom_bar(stat="identity", fill = "lightblue") + geom_text(aes(label=Freq), vjust=-0.3, size=3.5) + 
+theme_minimal() + theme(axis.text.x = element_text(angle = 60, vjust = 0.5, hjust=0.5)) + ggtitle("Top 10 Start Stations") + xlab("Station Name") + ylab("Total Trips Started Out of station") 
 
 plot2 <- ggplot(top_end_count, aes(reorder(Var1,-Freq), Freq)) + geom_bar(stat="identity", fill = "lightblue") + geom_text(aes(label=Freq), vjust=-0.3, size=3.5) + 
 theme_minimal() + theme(axis.text.x = element_text(angle = 60, vjust = 0.5, hjust=0.5)) + ggtitle("Top 10 End Stations") + xlab("Station Name") + ylab("Total Trips Ended at Station")
 grid.arrange(plot1, plot2, ncol= 2)
 ```
 
-#### Start/End Stations Maps Heatmap
+#### _Start/End Stations Maps_
 ```{r}
-#start stations heatmap 
+#start stations
 leaflet(citi) %>%
-  addProviderTiles(providers$providers$CartoDB.DarkMatter) %>% setView(lng = -73.98928, lat = 40.75042, zoom = 10) %>%
-  addHeatmap(
-    lng = ~start.station.longitude, lat = ~start.station.latitude,
-    blur = 20, max = 0.05, radius = 15
-  ) 
+  addProviderTiles(providers$providers$CartoDB.DarkMatter) %>% 
+  setView(lng = -73.98928, lat = 40.75042, zoom = 10) %>%
+addMarkers(lng = citi$start.station.longitude, lat = citi$start.station.latitude,
+     popup = "Starting")
 ```
 
 ```{r}
-#end stations heatmap 
+# #end stations 
 leaflet(citi) %>%
-  addProviderTiles(providers$providers$CartoDB.DarkMatter) %>% setView(lng = -73.98928, lat = 40.75042, zoom = 10) %>%
-  addHeatmap(
-    lng = ~end.station.longitude, lat = ~end.station.latitude,
-    blur = 20, max = 0.05, radius = 15
-  ) 
+addProviderTiles(providers$providers$CartoDB.DarkMatter) %>% 
+  setView(lng = -73.98928, lat = 40.75042, zoom = 10) %>%
+addMarkers(lng = citi$end.station.longitude, lat = citi$end.station.latitude,
+     popup = "Ending")
 ```
 
-#### Top Routes 
-```{r}
+#### _Top Routes_ 
+```{r, include=FALSE}
 citi$route <- paste(citi$start.station.name,citi$end.station.name,sep=" -> ")
 citi$path_long <- paste(citi$start.station.longitude,citi$end.station.longitude,sep=" , ")
 citi$path_lat <- paste(citi$start.station.latitude,citi$end.station.latitude,sep=" , ")
 
-top5_routes <- citi %>% group_by(route, path_long, path_lat, start.station.latitude, start.station.longitude, end.station.latitude, end.station.longitude) %>% summarize(count=n()) %>% ungroup() %>% arrange(desc(count)) %>% head(n=5) 
-
-leaflet(top5_routes) %>%  
-  addTiles() %>%
-  setView(-74, 40.75, zoom = 11.5) %>% 
-  addPolylines(lng = top5_routes$start.station.longitude, lat = top5_routes$start.station.latitude, group = ~route) %>%
-     addMarkers(lng = top5_routes$start.station.longitude, lat = top5_routes$start.station.latitude,
-     popup = "Starting") %>%
-     addMarkers(lng = top5_routes$end.station.longitude, lat = top5_routes$end.station.latitude,
-                popup = "Destination") 
-
+top5_routes <- citi %>% group_by(route, start.station.latitude, start.station.longitude, end.station.latitude, end.station.longitude) %>% summarize(count=n()) %>% ungroup() %>% arrange(desc(count)) %>% head(n=5) 
+gt(top5_routes) 
 ```
 
-#### Deficit/Surplus
 
-```{r}
+#### _Deficit/Surplus_
+
+```{r, include=FALSE}
 #departures
 bike_departures <- group_by(citi, station = `start.station.name`, latitude = `start.station.latitude`, longitude = `start.station.longitude`)
 departure_count <- summarise(bike_departures, count_dep = n()) 
@@ -162,7 +204,9 @@ arrival_count <- summarise(bike_arrivals, count_arrival = n())
 bike_deficit <- merge(departure_count, arrival_count, all = TRUE)
 bike_deficit[is.na(bike_deficit)] <- 0
 bike_deficit$deficit <- bike_deficit$count_dep - bike_deficit$count_arrival
+```
 
+```{r}
 #map by deficit (all stations)
 leaflet(bike_deficit) %>% 
   addTiles() %>%
@@ -170,85 +214,114 @@ leaflet(bike_deficit) %>%
   addCircleMarkers(lng = bike_deficit$longitude, lat = bike_deficit$latitude, 
                    popup = paste(bike_deficit$station, "<br>", ifelse(bike_deficit$deficit>=0, "Bike deficit = ", "Bike surplus = "), 
                                 abs(bike_deficit$deficit)), 
-                   radius = abs(bike_deficit$deficit)/5, color = ifelse(bike_deficit$deficit>0, "red", "green")) 
+                   radius = abs(bike_deficit$deficit)/5, color = ifelse(bike_deficit$deficit>0, "red", "green"))
 ```
 
 ```{r}
-popup <- paste0("<b>", bike_deficit$station, "</b><br>",
-                "Deficit/Surplus: ", bike_deficit$deficit, "<br>",
-                "Arrival Count: ", bike_deficit$count_arrival, "<br>",
-                "Departure Count: ", bike_deficit$count_dep, "<br>")
-```
+#top 5 surplus 
+bike_surplus_5 <-arrange(bike_deficit, (deficit))[1:5,]
+popup_1 <- paste0("<b>", bike_surplus_5$station, "</b><br>",
+                "Deficit/Surplus: ", bike_surplus_5$deficit, "<br>",
+                "Arrival Count: ", bike_surplus_5$count_arrival, "<br>",
+                "Departure Count: ", bike_surplus_5$count_dep, "<br>")
 
-```{r}
-#top 5 deficit 
-bike_deficit_5<-arrange(bike_deficit, (deficit))[1:5,]
-
-leaflet(bike_deficit_5) %>% 
+leaflet() %>% 
   addTiles() %>%
-  addMarkers(lng = ~longitude, lat = ~latitude, popup = popup) 
+  addMarkers(lng = bike_surplus_5$longitude, lat = bike_surplus_5$latitude, popup = popup_1) 
+gt(bike_surplus_5) %>% 
+ cols_label(
+    station = "Station",
+    latitude = "Latitude",
+    longitude = "Longitude",
+    count_dep = "Departures",
+    count_arrival = "Arrivals", 
+    deficit = "Surplus")
 ```
 
 ```{r}
-#top 5 surplus
-bike_surplus_5<-arrange(bike_deficit, -deficit)[1:5,]
-
-leaflet(bike_surplus_5) %>% 
+#top 5 deficit
+bike_deficit_5<-arrange(bike_deficit, -deficit)[1:5,]
+popup_2 <- paste0("<b>", bike_deficit_5$station, "</b><br>",
+                "Deficit/Surplus: ", bike_deficit_5$surplus, "<br>",
+                "Arrival Count: ", bike_surplus_5$count_arrival, "<br>",
+                "Departure Count: ", bike_surplus_5$count_dep, "<br>")
+leaflet() %>% 
   addTiles() %>%
-  addMarkers(lng = ~longitude, lat = ~latitude, popup = popup) 
+  addMarkers(lng = bike_deficit_5$longitude, lat = bike_deficit_5$latitude, popup = popup_2) 
+gt(bike_deficit_5) %>% 
+ cols_label(
+    station = "Station",
+    latitude = "Latitude",
+    longitude = "Longitude",
+    count_dep = "Departures",
+    count_arrival = "Arrivals", 
+    deficit = "Deficit")
 ```
 
-#### Start Stations by Usertype 
+#### _Start Stations by Usertype_ 
 
-```{r}
+```{r, include= FALSE}
 citistations <- citi %>%
   group_by(start.station.name, start.station.latitude, start.station.longitude, usertype) %>%
   summarize(count = n())
 colnames(citistations) <- c("name", "lat", "long", "usertype", "count") 
 
-# Replace with NA those stations that do not have a name
-citistations[citistations$name == "NULL"] <- NA
-
 # Gets rid of all the rows with NA
 citistations <- citistations[complete.cases(citistations[,1:3]),]
-
-m2 <- leaflet(citistations) %>% 
-      addTiles() %>% 
-      addCircleMarkers(lat = citistations$lat, lng = citistations$long, popup = citistations$name, radius = citistations$count/100, color = ifelse(citistations$usertype == "Subscriber", "blue", "red"))
-m2
 ```
 
-#### Start Stations by Usertype
-
 ```{r}
+leaflet(citistations) %>% 
+      addTiles() %>% 
+      addCircleMarkers(lat = citistations$lat, lng = citistations$long, popup = citistations$name, radius = citistations$count/100, color = ifelse(citistations$usertype == "Subscriber", "blue", "red"))
+```
+
+#### _Start Stations by Gender_
+
+```{r, include=FALSE}
 citi <- citi[!(citi$gender=="unknown"),]
 citistations_gender <- citi %>%
   group_by(start.station.name, start.station.latitude, start.station.longitude, gender) %>%
   summarize(count = n())
 colnames(citistations_gender) <- c("name", "lat", "long", "gender", "count") 
 
-# Replace with NA those stations that do not have a name
-citistations_gender[citistations_gender == "NULL"] <- NA
-
 # Gets rid of all the rows with NA
 citistations_gender <- citistations_gender[complete.cases(citistations_gender[,1:3]),]
+```
 
-m3 <- leaflet(citistations_gender) %>% 
+```{r}
+leaflet(citistations_gender) %>% 
       addTiles() %>% 
       addCircleMarkers(lat = citistations_gender$lat, lng = citistations_gender$long, popup = citistations_gender$name, radius = citistations_gender$count/100, color = ifelse(citistations_gender$gender == "male", "blue", "red"))
-
-m3
 ```
 
-### 4. Bike Usage
+## **Bike Usage** 
 
-### 5. Impact of Weather
-#### Does temperature affect when users ride citibikes?
+
+
+## **Weather Impact** 
+
 ```{r}
-ggplot(citi) + geom_histogram(aes(x = TAVG, fill = usertype)) + xlim(0,100) + ggtitle("Counts of rides for average temperatures, broken down by usertype")
+ggplot(citi) + geom_histogram(aes(x = TAVG, fill = usertype)) + xlim(0,100) + ggtitle("Ride by Average Temperatures, by usertype") + theme_fivethirtyeight() 
 ```
 
+# **Recommendations**
+
+Based on our findings, we recommend that CitiBike take the following actions: 
+
+- In terms of their marketing efforts, Citibike should consider implementing demographic specific initiatives. They should focus their attention on increasing marketing efforts that target women and elderly individuals. They could also help attract more female user by emphasizing safety initiatives to remove deterrents. In addition, they can offer senior discounts to target the older demographic. 
+
+- Target certain customer types based on day of week : Improve low ridership from customers on weekdays, and from subscribers on weekends by offering discounts on bikes (for customers) and ebikes (subscribers)
+
+- Vary pricing strategies based on inclement weather : Lower prices/offer discounts on rainy or snowy days & days when temp is below 50 degrees
+
+- Manage surpluses and deficits : Incentivize riders to drop off/pick up bikes from certain stations that tend to have extra/not enough bikes available
 
 
-### 6. Insights and Recommendations
+
+
+
+
+
+
 

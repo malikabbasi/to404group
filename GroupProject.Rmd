@@ -11,6 +11,7 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(cache = TRUE)
 ```
 
 ```{r, include=FALSE}
@@ -317,6 +318,28 @@ citi %>% group_by(bikeid) %>% summarise(mean = mean(speedMilesperHour)) %>% filt
 ```{r}
 ggplot(citi) + geom_histogram(aes(x = TAVG, fill = usertype)) + xlim(0,100) + ggtitle("Ride by Average Temperatures, by usertype") + theme_fivethirtyeight() 
 ```
+The data shows that users in general ride the most when the temperature is between 60 and 75 degrees Fahrenheit. Below 55 degrees and above 80 degrees, both subscribers and customers ride much less. There is a confounding variable with this observation, however; there are many more days of the year where temperature is between 60 and 75 degrees than days when temperatures are at their extremes.
+
+
+```{r}
+ggplot(data = citi, aes(y = SNOW, x = tripduration/60)) + geom_point(alpha = .1, color = "red") + labs(x = "duration") +labs(y = "snow accumulation") + scale_x_log10() + ggtitle("Duration of rides when snowing")  + theme_fivethirtyeight() + theme(axis.title = element_text()) + ylab("Amount of snow falling") + xlab("Duration of ride (minutes)")
+
+```
+This plot, depicting ride duration compared to snowfall, shows that ride length sharply falls off when there is any amount of snow falling. Some rides, when there is no snow, last above 10000 minutes, whereas when there is any amount of snowfall, rides do not exceed 100 minutes.
+
+
+```{r}
+ ggplot(data = citi, aes(y = PRCP, x = tripduration/60)) + geom_point(alpha = .1, color = "blue") + labs(x = "duration") +labs(y = "Precipitation accumulation") + scale_x_log10() + ggtitle("Duration of rides when raining")  + theme_fivethirtyeight() + theme(axis.title = element_text()) + ylab("Amount of rain falling") + xlab("Duration of ride (minutes)")
+
+```
+This plot is very similar to the above one regarding snowfall, however it is for rainfall. Similar results are observed: with any amount of rain precipitation, ride duration sharply falls off. While there are outliers of 10000+ minute duration rides when it is raining, the large majority of the data is clustered in the 1 to 100 minute duration range. 
+
+
+```{r}
+  ggplot(data = citi, aes(y = AWND, x = tripduration/60)) + geom_point(alpha = .1, color = "darkgreen") + labs(x = "duration") +labs(y = "Precipitation accumulation") + scale_x_log10() + ggtitle("Duration of rides by wind speed")  + theme_fivethirtyeight() + theme(axis.title = element_text()) + ylab("Wind speed") + xlab("Duration of ride (minutes)")
+```
+The third weather factor examined, wind speed, does not have as clear cut implications as snowfall and rainfall versus duration do. Citibike users ride for a wide range of time periods, regardless of the wind speed while they do so.
+
 
 # **Recommendations**
 

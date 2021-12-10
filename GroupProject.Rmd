@@ -51,6 +51,8 @@ Our report provides findings that showcase how riders tend to be 39 years or you
 
 ## **Exploratory Visualizations**
 
+We first began by creating exploratory visualizations to see the population demographics of NYC riders, in particular looked at gender and age. 
+
 #### _Gender_
 
 ```{r, include=FALSE}
@@ -83,17 +85,27 @@ In terms of the age distribution, it is clear that the majority of riders tend t
 ggplot(data = citi, aes(x = age, y = distMiles)) + geom_point() + geom_smooth(method = 'lm') + ggtitle("Comparison of Age to Distance traveled") + theme_fivethirtyeight()
 ```
 
+We conducted outside research of NYC general population demographics and found that there are more females in the area and younger overall ages. This leads us to believe that if CitiBike would target females and the older population with their marketing and recruitment initiatives they could increase overall ridership. 
 
 ## **Ride History Patterns**
 
+#### _Rides by Weekday/Hour_
 
-#### _Usertype_ 
+```{r, include=FALSE}
+citi$weekday <- wday(citi$starttime, label=TRUE)
+```
 
 ```{r}
-
-
-
+ggplot(citi) + geom_bar(aes(x=weekday, y=(..count..)/sum(..count..), fill=usertype)) + ggtitle("Rides on days of week, by usertype") + theme_fivethirtyeight() + xlab("Weekday") + ylab("Percentage of All Rides")
 ```
+
+We can see from the graph that the majority of riders are subscribers. Also, as you would expect, the customer group are heavier users during the weekend, as opposed to the subscriber group that use the service mostly between Monday and Friday. This makes sense as customers tend to be utilizing bikes for leisure as opposed to general travel. 
+
+```{r}
+ggplot(citi) + geom_bar(aes(x = hour, y=(..count..)/sum(..count..), fill = usertype)) + ylab("% of rides") + ggtitle("Rides per hour of the day, by usertype") 
+```
+
+From above, we can see that there is significantly less bike usage for both usertypes in the early mornings. We can also see that customers have higher utilization midday and in the afternoons which coincides with the findings in the previous graph since that is a typical time range for individuals to be taking a leisure ride. Citibike could consider lowering prices (the flat fee) for customers during the times in the day with lower rides in order to encourage more overall ridership.  
 
 #### _Commute Times_
 
@@ -110,7 +122,7 @@ citi <- na.omit(citi)
 ggplot(citi) + geom_bar(aes(time, fill=gender)) + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) + ggtitle(expression(atop("Commute Times by Gender"))) + scale_fill_manual(values = c("lightgreen", "lightblue","pink")) + scale_fill_brewer(palette="Set2") + theme_fivethirtyeight() #+transition_states(states = time)+enter_fade() + shadow_mark()  
 ```
 
-The most popular times for rides seem to occur during the morning commute time of 7am-10am as well as the late afternoon / evening commute of 4pm to 7pm. Using information from the previous graph that showcases how majority of riders are subscribers that utilize the bikes more heavily during the weekdays, we can see that these time gaps correlate to working hours. Thus, subscribers usually take the bikes to get to work in the morning and then to get back home in the late afternoons/evenings. This information could be useful for CitiBike to use to make sure bikes are available for use during the most frequented times of day. 
+The most popular times for rides seem to occur during the morning commute time of 7am-10am as well as the late afternoon / evening commute of 4pm to 7pm. Using information from the previous graphs that showcases how majority of riders are subscribers that utilize the bikes more heavily during the weekdays, we can see that these time gaps correlate to working hours. Thus, subscribers usually take the bikes to get to work in the morning and then to get back home in the late afternoons/evenings. This information could be useful for CitiBike to use to make sure bikes are available for use during the most frequented times of day. 
 
 ```{r, include=FALSE}
 avg_speed_age <- citi %>% filter(gender == "male" | gender == "female", age < 90)
@@ -123,19 +135,7 @@ avg_speed_age <- avg_speed_age %>% group_by(age, gender) %>% summarize(mean_spee
 ggplot(avg_speed_age) + geom_line(aes(as.numeric(age), mean_speed, color = gender)) + labs(title = "Average Speed based on Age and Gender in 2019", x = "Age", y = "Average Speed (Miles Per Hour)") + theme(plot.title = element_text(hjust = 0.7)) + theme_fivethirtyeight() + scale_color_discrete(name = "Gender", labels = c("Female", "Male")) #+ transition_reveal(age)
 ```
 
-#### _Rides by Weekday/Hour_
-
-```{r, include=FALSE}
-citi$weekday <- wday(citi$starttime, label=TRUE)
-```
-
-```{r}
-ggplot(citi) + geom_bar(aes(x=weekday, y=(..count..)/sum(..count..), fill=usertype)) + ggtitle("Rides on days of week, by usertype") + theme_fivethirtyeight() + xlab("Weekday") + ylab("Percentage of All Rides")
-```
-
-```{r}
-ggplot(citi) + geom_bar(aes(x = hour, y=(..count..)/sum(..count..), fill = usertype)) + ylab("% of rides") + ggtitle("Rides per hour of the day, by usertype") 
-```
+Average speed seems to generally decrease as age increases, regardless of gender. It was interesting to see that females over the age of approximately 75 tend to ride faster than males in the same age range. But across all ages, males tend to ride faster than females, on average. This information could help CitiBike program target initiatives for safer riding towards the male population which would help the older population in general be more inclined to ride bikes. 
 
 
 ## **Traffic** 
@@ -161,24 +161,29 @@ theme_minimal() + theme(axis.text.x = element_text(angle = 60, vjust = 0.5, hjus
 grid.arrange(plot1, plot2, ncol= 2)
 ```
 
+
+We investigated the start and end stations to see which stations tend to be frequented by riders the most. It's clear that some stations have a lot of traffic going in and out. For instance, Perishing Square North is the top start and end station and deserves further investigation to see if traffic is evenly distributed so that CitiBike can ensure that there are available bikes for users at all times. 
+
 #### _Start/End Stations Maps_
 ```{r}
 #start stations
 leaflet(citi) %>%
-  addProviderTiles(providers$providers$CartoDB.DarkMatter) %>% 
+  addTiles() %>% 
   setView(lng = -73.98928, lat = 40.75042, zoom = 10) %>%
 addMarkers(lng = citi$start.station.longitude, lat = citi$start.station.latitude,
      popup = "Starting")
 ```
 
 ```{r}
-# #end stations 
+#end stations 
 leaflet(citi) %>%
-addProviderTiles(providers$providers$CartoDB.DarkMatter) %>% 
+addTiles() %>% 
   setView(lng = -73.98928, lat = 40.75042, zoom = 10) %>%
 addMarkers(lng = citi$end.station.longitude, lat = citi$end.station.latitude,
      popup = "Ending")
 ```
+
+NEED DESCRIPTION ONCE MAPS ARE ABLE TO LOAD
 
 #### _Top Routes_ 
 ```{r, include=FALSE}
@@ -187,8 +192,13 @@ citi$path_long <- paste(citi$start.station.longitude,citi$end.station.longitude,
 citi$path_lat <- paste(citi$start.station.latitude,citi$end.station.latitude,sep=" , ")
 
 top5_routes <- citi %>% group_by(route, start.station.latitude, start.station.longitude, end.station.latitude, end.station.longitude) %>% summarize(count=n()) %>% ungroup() %>% arrange(desc(count)) %>% head(n=5) 
+```
+
+```{r}
 gt(top5_routes) 
 ```
+
+When looking at the top 5 routes, we can see that Central Park shows up as a start station twice. It is also interesting to see that the second most popular route is the Central Park loop, which makes sense as this is a common area for tourists and therefore leisure rides. 
 
 
 #### _Deficit/Surplus_
@@ -218,6 +228,8 @@ leaflet(bike_deficit) %>%
                                 abs(bike_deficit$deficit)), 
                    radius = abs(bike_deficit$deficit)/5, color = ifelse(bike_deficit$deficit>0, "red", "green"))
 ```
+
+In map above, we can see all of the stations that have deficits and surpluses throughout NYC. The bigger the circle markers, the more deficit (red) or surplus (green), that the station is experiencing. This is a great tool for CitiBike to use in order to determine what nearby stations can be used to counteract assymetric traffic. For instance, if you zoom in towards Old Fulton St station that has a surplus, you can see that there are two nearby stations with deficits, meaning that riders could be incentivized to drop off their bikes at those stations instead.  
 
 ```{r}
 #top 5 surplus 
@@ -260,6 +272,8 @@ gt(bike_deficit_5) %>%
     deficit = "Deficit")
 ```
 
+The maps above showcase the top surpluses and deficits, respectively. Continuing the notion from earlier, Citibike can use this information to make sure that all stations have available bikes by counteracting the stations with deficit by incentivizing pickups from surrounding surplus stations or vice versa for surplus stations. 
+
 #### _Start Stations by Usertype_ 
 
 ```{r, include= FALSE}
@@ -277,6 +291,8 @@ leaflet(citistations) %>%
       addTiles() %>% 
       addCircleMarkers(lat = citistations$lat, lng = citistations$long, popup = citistations$name, radius = citistations$count/100, color = ifelse(citistations$usertype == "Subscriber", "blue", "red"))
 ```
+
+NEED DESCRIPTION ONCE MAPS ARE ABLE TO LOAD
 
 #### _Start Stations by Gender_
 
@@ -297,20 +313,30 @@ leaflet(citistations_gender) %>%
       addCircleMarkers(lat = citistations_gender$lat, lng = citistations_gender$long, popup = citistations_gender$name, radius = citistations_gender$count/100, color = ifelse(citistations_gender$gender == "male", "blue", "red"))
 ```
 
-## **Bike Usage** 
-```{r}
-ggplot(citi) + geom_histogram(aes(x = bikeid), stat= "count") + ggtitle("Count of rides per bikeid")
+NEED DESCRIPTION ONCE MAPS ARE ABLE TO LOAD
 
-citi %>% group_by(bikeid) %>% summarise(total = sum(tripduration)) %>% ggplot(aes(reorder(bikeid, total), total)) + geom_col() + scale_y_log10(labels = comma) + ggtitle("Total Duration of Rides per Bike") + theme_fivethirtyeight() + theme(axis.title.x=element_blank(),
+## **Bike Usage** 
+
+```{r, include=FALSE}
+plot_1 <- ggplot(citi) + geom_histogram(aes(x = bikeid), stat= "count") + ggtitle("Count of rides per bikeid")
+
+plot_2 <- citi %>% group_by(bikeid) %>% summarise(total = sum(tripduration)) %>% ggplot(aes(reorder(bikeid, total), total)) + geom_col() + scale_y_log10(labels = comma) + ggtitle("Total Duration of Rides per Bike") + theme_fivethirtyeight() + theme(axis.title.x=element_blank(),
         axis.text.x=element_blank(),
         axis.ticks.x=element_blank()) + theme(axis.title = element_text()) + ylab("Duration (seconds)")
+top5_bikes <- citi %>% group_by(bikeid, tripduration) %>% summarise() %>% ungroup() %>% arrange(desc(tripduration)) %>% head(n=5) 
+```
 
+```{r}
+grid.arrange(plot_1, plot_2)
 citi %>% group_by(bikeid) %>% summarise(mean = mean(speedMilesperHour)) %>% filter(mean > 0) %>% ggplot(aes(reorder(bikeid, mean), mean)) + geom_col() + ggtitle("Average Speed per Bike") + theme_fivethirtyeight() + theme(axis.title.x=element_blank(),
         axis.text.x=element_blank(),
         axis.ticks.x=element_blank()) + scale_y_continuous(labels = comma) + theme(axis.title = element_text()) + ylab("Miles per Hour")
 
+gt(top5_bikes) 
 ```
 
+
+The above plots showcase how often bikes are used and how long they are typically used for. CitiBike can use this information to determine which bikes require more maintenance and also to consider initiatives that could help distribute usage throughout all bikes. For instance, adding a feature in the app that tracks total miles per bikeid so riders can decide to use bikes with less miles. 
 
 
 ## **Weather Impact** 
@@ -347,11 +373,11 @@ Based on our findings, we recommend that CitiBike take the following actions:
 
 - In terms of their marketing efforts, Citibike should consider implementing demographic specific initiatives. They should focus their attention on increasing marketing efforts that target women and elderly individuals. They could also help attract more female user by emphasizing safety initiatives to remove deterrents. In addition, they can offer senior discounts to target the older demographic. 
 
-- Target certain customer types based on day of week : Improve low ridership from customers on weekdays, and from subscribers on weekends by offering discounts on bikes (for customers) and ebikes (subscribers)
+- In terms of their policies for different usertypes, they should target certain usertypes based on day of week. For instance, they should improve low ridership from customers on weekdays, and from subscribers on weekends by offering discounts on bikes (for customers) and ebikes (subscribers). 
 
-- Vary pricing strategies based on inclement weather : Lower prices/offer discounts on rainy or snowy days & days when temp is below 50 degrees
+- In terms of their pricing strategies, they should take weather impact into account. Based on current low ridership during inclement weather, they should lower prices/offer discounts on rainy or snowy days & days when temp is below 50 degrees. 
 
-- Manage surpluses and deficits : Incentivize riders to drop off/pick up bikes from certain stations that tend to have extra/not enough bikes available
+- In terms of managing surpluses and deficits, we would suggest that they incentivize riders to drop off/pick up bikes from certain stations that tend to have extra/not enough bikes available. 
 
 
 
